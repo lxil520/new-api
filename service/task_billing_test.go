@@ -219,6 +219,30 @@ func TestRefundTaskQuota_Wallet(t *testing.T) {
 	assert.Equal(t, "test-model", log.ModelName)
 }
 
+func TestRefundTaskQuota_PropagatesRequestIds(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 101, 101, 101
+	const initQuota, preConsumed = 10000, 3000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-request-id-refund", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.PrivateData.RequestId = "req_task_001"
+	task.PrivateData.UpstreamRequestId = "up_req_task_001"
+
+	RefundTaskQuota(ctx, task, "task failed")
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Equal(t, model.LogTypeRefund, log.Type)
+	assert.Equal(t, "req_task_001", log.RequestId)
+	assert.Equal(t, "up_req_task_001", log.UpstreamRequestId)
+}
+
 func TestRefundTaskQuota_Subscription(t *testing.T) {
 	truncate(t)
 	ctx := context.Background()
